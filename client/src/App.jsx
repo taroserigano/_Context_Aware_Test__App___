@@ -3,7 +3,7 @@ import { useState, useCallback, useEffect } from "react";
 import RecordSelector from "./components/RecordSelector.jsx";
 import PipelineView from "./components/PipelineView.jsx";
 import ResultPanel from "./components/ResultPanel.jsx";
-
+import ScoreCard from "./components/ScoreCard.jsx";
 
 const STAGES = [
   { id: "enricher", name: "Enricher", desc: "Pre-compute context (no LLM)" },
@@ -20,7 +20,7 @@ const STAGES = [
   },
   { id: "compliance", name: "Compliance", desc: "Check & repair violations" },
   { id: "planner", name: "Planner", desc: "Decide next CRM action" },
-
+  { id: "evaluator", name: "Evaluator", desc: "Score vs expected" },
 ];
 
 export default function App() {
@@ -195,7 +195,7 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <div>
-          <h1>Context-Aware Message Bot</h1>
+          <h1>Context-Aware Message Generator</h1>
           <div className="subtitle">
             Multi-Agent LangGraph Pipeline &bull; Pattern Learning &bull;
             Semantic Scoring
@@ -238,6 +238,7 @@ export default function App() {
           {result && selectedRecord && (
             <>
               <ResultPanel record={selectedRecord} result={result} />
+              <ScoreCard scores={result.scores} />
             </>
           )}
 
@@ -261,12 +262,23 @@ export default function App() {
                 >
                   <div className="task-id">{r.taskId}</div>
                   <div className="meta">
-                    Channel: {r.channelDecision?.channel} &bull; Action:{" "}
+                    Score:{" "}
+                    <strong
+                      className={
+                        r.scores?.composite >= 0.8
+                          ? "text-success"
+                          : r.scores?.composite >= 0.6
+                            ? "text-warning"
+                            : "text-error"
+                      }
+                    >
+                      {((r.scores?.composite || 0) * 100).toFixed(1)}%
+                    </strong>{" "}
+                    &bull; Channel: {r.channelDecision?.channel} &bull; Action:{" "}
                     {r.actionPlan?.type}
                   </div>
                 </div>
               ))}
-
             </div>
           )}
 

@@ -70,6 +70,7 @@ export default function ResultPanel({ record, result }) {
               timingDecision: result.timingDecision,
               messageOutput: result.messageOutput,
               actionPlan: result.actionPlan,
+              scores: result.scores,
             },
             null,
             2,
@@ -159,5 +160,3 @@ function ComplianceView({ result }) {
     </div>
   );
 }
-
-

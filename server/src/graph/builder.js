@@ -6,22 +6,28 @@ import { strategistNode } from "./agents/strategist.js";
 import { copywriterNode } from "./agents/copywriter.js";
 import { complianceNode } from "./agents/compliance.js";
 import { plannerNode } from "./agents/planner.js";
+import { evaluatorNode } from "./agents/evaluator.js";
 
 /**
  * Build and compile the multi-agent LangGraph pipeline.
  *
  * Flow:
  *   START → enricher → analyst → strategist → copywriter
- *         → compliance → planner → END
+ *         → compliance → planner → evaluator → END
  */
+let _compiled = null;
+
 export function buildPipelineGraph() {
+  if (_compiled) return _compiled;
+
   const workflow = new StateGraph(PipelineState)
     .addNode("enricher", enricherNode)
     .addNode("analyst", analystNode)
     .addNode("strategist", strategistNode)
     .addNode("copywriter", copywriterNode)
     .addNode("compliance", complianceNode)
-    .addNode("planner", plannerNode);
+    .addNode("planner", plannerNode)
+    .addNode("evaluator", evaluatorNode);
 
   // Linear edges
   workflow.addEdge(START, "enricher");
@@ -30,7 +36,9 @@ export function buildPipelineGraph() {
   workflow.addEdge("strategist", "copywriter");
   workflow.addEdge("copywriter", "compliance");
   workflow.addEdge("compliance", "planner");
-  workflow.addEdge("planner", END);
+  workflow.addEdge("planner", "evaluator");
+  workflow.addEdge("evaluator", END);
 
-  return workflow.compile();
+  _compiled = workflow.compile();
+  return _compiled;
 }

@@ -4,38 +4,45 @@ import { getChatModel } from "../../services/llmClient.js";
 const COPYWRITER_SYSTEM_PROMPT = `You are a property marketing copywriter for a residential apartment community.
 
 Your job is to compose a personalized outreach message for a prospect or resident.
+Your output body must be EXTREMELY close — nearly identical — to the reference examples provided.
 
-CRITICAL REQUIREMENTS:
+ABSOLUTE RULES:
 - Use the prospect's FIRST NAME in the greeting
 - Reference SPECIFIC details from their profile (amenity interests, city, move date, property name)
-- Match the CHANNEL format:
-  * SMS: Concise single paragraph, ~160 chars. End with "Reply STOP to opt out."
-  * Email: Multi-line. Greeting line, body paragraph(s), CTA link line, then "To opt out of emails, click here or reply STOP." as the last line.
-- Include appropriate opt-out instructions at the END of the message (as shown in examples)
-- Include a clear CTA (call to action)
 - Do NOT include any discriminatory language (fair housing compliance)
 - Do NOT leak PII beyond first name
-- Keep tone warm, professional, and helpful
 
-For CTA format:
-- SMS: use quick-reply number options (e.g. "Reply 1 for Thu, 2 for Fri")
-- Email: use link-based CTAs with a URL like https://propertyname.example/tour
+SMS FORMAT (follow this skeleton EXACTLY):
+"Hi {FirstName}—welcome to {PropertyName}! {1 sentence about tours/availability}. {Question with 2 options}? Reply 1 for {Option1}, 2 for {Option2}. Reply STOP to opt out."
+- Single paragraph, ~140-160 chars total
+- Use em-dash (—) after the name, NOT a comma
+- Subject MUST be null
+- CTA: numbered quick-reply options
+- End with exactly: "Reply STOP to opt out."
 
-IMPORTANT: Your body output must be the COMPLETE final message text EXACTLY as the recipient will see it.
-Study the few-shot examples extremely carefully and replicate their EXACT style, structure, length, formatting, and opt-out text.
-The body you return is sent directly — nothing is appended or modified after you.`;
+EMAIL FORMAT (follow this skeleton EXACTLY, using \\n for line breaks):
+"Hi {FirstName},\\n{1-2 sentences referencing their interests/timeline and property amenities}. {Action suggestion}.\\nBook now → https://{propertyslug}.example/tour\\nTo opt out of emails, click here or reply STOP."
+- Lines separated by \\n (newline)
+- Line 1: "Hi {FirstName},"
+- Line 2: Body with personalized content about their specific amenity interests + move timeline
+- Line 3: "Book now → https://{propertyslug}.example/tour"
+- Line 4: "To opt out of emails, click here or reply STOP."
+- Subject: specific, references prospect's amenity interests and property name
+- CTA link: https://{propertyslug}.example/tour
+
+CRITICAL: Study the few-shot examples character-by-character. Replicate the EXACT wording patterns, punctuation (em-dashes, arrows →), line break positions, opt-out text, and CTA format. The body similarity score is computed by semantic embedding — the closer your wording, the higher the score.`;
 
 const messageSchema = z.object({
   subject: z
     .string()
     .nullable()
     .describe(
-      "Email subject line (null for SMS). Be specific and reference prospect interests/amenities/property.",
+      "Email subject line (null for SMS). Reference property name and prospect's specific interests/amenities.",
     ),
   body: z
     .string()
     .describe(
-      "COMPLETE final message body exactly as the recipient will see it. Includes greeting, personalized content, CTA, and opt-out instructions. Match few-shot examples precisely.",
+      "COMPLETE final message body. Must match the reference examples' exact structure, punctuation, em-dashes, arrows, newline positions, and opt-out text character-for-character.",
     ),
   cta: z.object({
     type: z
@@ -79,8 +86,7 @@ export async function copywriterNode(state) {
     timingDecision,
   );
 
-  // Use low temperature for deterministic output with strong few-shot anchoring
-  const model = getChatModel({ temperature: 0.2 });
+  const model = getChatModel({ temperature: 0 });
   const structured = model.withStructuredOutput(messageSchema);
   const result = await structured.invoke([
     { role: "system", content: COPYWRITER_SYSTEM_PROMPT },
@@ -146,12 +152,16 @@ function buildCopywriterPrompt(
     }
   }
 
-  prompt += `## Task\nCompose a personalized ${channel} message for this prospect. `;
-  prompt += `Replicate the EXACT formatting, style, length, tone, and structure from the reference examples above. `;
+  prompt += `## Task
+Compose a personalized ${channel} message for this prospect. `;
+  prompt += `Your body text must be NEARLY IDENTICAL to the reference examples above — same structure, same punctuation, same line breaks, same opt-out wording. `;
+  prompt += `Swap in this prospect's details (name, property, amenities, city, dates) but keep EVERYTHING ELSE the same as the examples. `;
   if (channel === "sms") {
-    prompt += `SMS format: single paragraph, concise (~160 chars), greeting + content + CTA options + "Reply STOP to opt out." at the end. Subject must be null.\n`;
+    prompt += `\nSMS SKELETON: "Hi {Name}\u2014welcome to {Property}! {1 sentence}. {Question}? Reply 1 for {X}, 2 for {Y}. Reply STOP to opt out."\n`;
+    prompt += `Subject MUST be null. Use em-dash (\u2014) not comma after name. Keep under 160 chars.\n`;
   } else {
-    prompt += `Email format: greeting line, body paragraph(s) referencing their interests, CTA link line ("Book now → URL"), then "To opt out of emails, click here or reply STOP." as the last line. Subject should be specific and reference their interests.\n`;
+    prompt += `\nEMAIL SKELETON (use \\n for line breaks):\nLine 1: "Hi {Name},"\nLine 2: "{Personalized body referencing their specific amenities/timeline}. {Suggestion}."\nLine 3: "Book now \u2192 https://{propertyslug}.example/tour"\nLine 4: "To opt out of emails, click here or reply STOP."\n`;
+    prompt += `Subject must reference property name + prospect's specific amenity interests. Use \u2014 (em-dash) in body for inline breaks if needed.\n`;
   }
   return prompt;
 }

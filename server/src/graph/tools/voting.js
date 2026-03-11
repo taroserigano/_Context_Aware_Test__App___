@@ -14,11 +14,16 @@ export async function voteOnResult(invoker, options = {}) {
 
   // Run n calls in parallel at higher temperature for diversity
   const model = getChatModel({ temperature: 0.7 });
-  const promises = Array.from({ length: n }, () => invoker(model));
-  const results = await Promise.all(promises);
+  const promises = Array.from({ length: n }, () =>
+    invoker(model).catch(() => null),
+  );
+  const results = (await Promise.all(promises)).filter(Boolean);
+
+  if (results.length === 0) {
+    throw new Error("All voting calls failed");
+  }
 
   if (!voteKey) {
-    // No voting key — just return first successful result
     return results[0];
   }
 

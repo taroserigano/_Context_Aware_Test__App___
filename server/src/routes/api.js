@@ -19,8 +19,10 @@ router.get("/config", (req, res) => {
 
 router.get("/records", (req, res) => {
   try {
-    const jsonlPath = process.env.JSONL_PATH || "../sample.jsonl";
-    cachedRecords = parseJsonl(jsonlPath);
+    if (!cachedRecords) {
+      const jsonlPath = process.env.JSONL_PATH || "../sample.jsonl";
+      cachedRecords = parseJsonl(jsonlPath);
+    }
     res.json({ records: cachedRecords });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -136,6 +138,7 @@ router.post("/process-all", async (req, res) => {
     Connection: "keep-alive",
   });
 
+  const graph = buildPipelineGraph();
   const results = [];
 
   for (const record of cachedRecords) {
@@ -144,7 +147,6 @@ router.post("/process-all", async (req, res) => {
         `data: ${JSON.stringify({ type: "start", taskId: record.task_id })}\n\n`,
       );
 
-      const graph = buildPipelineGraph();
       let finalState = {};
 
       const stream = await graph.stream(
@@ -166,6 +168,7 @@ router.post("/process-all", async (req, res) => {
 
       results.push({
         taskId: record.task_id,
+        scores: finalState.scores,
         channelDecision: finalState.channelDecision,
         timingDecision: finalState.timingDecision,
         messageOutput: finalState.messageOutput,

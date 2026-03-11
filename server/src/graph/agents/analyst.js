@@ -31,11 +31,13 @@ Focus on extracting rules for:
    - What determines targetHour? Does it differ by channel (SMS=9AM, email=10AM) or urgency?
    - Rule format: "IF urgency=high THEN dayOffset=1, targetHour=9"
 
-3. MESSAGE BODY STYLE:
-   - SMS: exact structure (greeting + content + CTA options + opt-out, single paragraph)
-   - Email: exact structure (greeting line, body paragraphs, CTA link line, opt-out line)
+3. MESSAGE BODY STYLE (CRITICAL — extract exact templates):
+   - SMS: Copy the EXACT body text from examples as a template. Note the em-dash (—) after the name, the single-paragraph structure, the question with numbered reply options, and the "Reply STOP to opt out." ending.
+   - Email: Copy the EXACT body text from examples as a template. Note the newline-separated structure: "Hi Name," then body paragraphs, then "Book now → https://slug.example/tour" then "To opt out of emails, click here or reply STOP."
+   - For each example, QUOTE the full expected body text verbatim as part of the rule, so downstream agents can replicate it character-for-character.
    - What opt-out text is used? SMS: "Reply STOP to opt out." Email: "To opt out of emails, click here or reply STOP."
    - How is personalization applied (first name, property, amenities, city, move timeline)?
+   - What special characters are used? Em-dashes (—), arrows (→), mid-dots (·)?
 
 4. CTA FORMAT:
    - SMS: quick-reply numbered options (e.g. "Reply 1 for Thu, 2 for Fri")
@@ -87,32 +89,48 @@ export async function learnPatterns(allRecords) {
   const model = getChatModel({ temperature: 0.1 });
   const structured = model.withStructuredOutput(rulebookSchema);
 
+  // Compact summary — only the fields agents need, not full pretty-printed JSON
   const recordsSummary = allRecords
-    .map(
-      (r, i) =>
-        `--- Record ${i + 1} (${r.task_id}) ---\n${JSON.stringify(r, null, 2)}`,
-    )
+    .map((r, i) => {
+      const {
+        input,
+        expected,
+        consent,
+        channel_preferences,
+        persona,
+        lifecycle_stage,
+        task_id,
+        assertions,
+      } = r;
+      return `--- Record ${i + 1} (${task_id}) ---\n${JSON.stringify({ task_id, persona, lifecycle_stage, consent, channel_preferences, input, assertions, expected })}`;
+    })
     .join("\n\n");
 
-  const result = await structured.invoke([
-    { role: "system", content: ANALYST_SYSTEM_PROMPT },
-    {
-      role: "user",
-      content: `Analyze these records and extract the decision rules:\n\n${recordsSummary}`,
-    },
+  // Run LLM analysis and vector store embedding in parallel
+  const vsPromise = (async () => {
+    const vs = new VectorStore();
+    const docs = allRecords.map((r) => ({
+      text: buildRecordContextText(r),
+      metadata: { taskId: r.task_id, record: r },
+    }));
+    await vs.addDocuments(docs);
+    return vs;
+  })();
+
+  const [result, vs] = await Promise.all([
+    structured.invoke([
+      { role: "system", content: ANALYST_SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: `Analyze these records and extract the decision rules:\n\n${recordsSummary}`,
+      },
+    ]),
+    vsPromise,
   ]);
 
   // Store in runtime
   setRulebook(result.rulebook);
   setPatterns(result.patterns);
-
-  // Build vector store with record contexts for few-shot retrieval
-  const vs = new VectorStore();
-  const docs = allRecords.map((r) => ({
-    text: buildRecordContextText(r),
-    metadata: { taskId: r.task_id, record: r },
-  }));
-  await vs.addDocuments(docs);
   setVectorStore(vs);
 
   setLearned(true);
