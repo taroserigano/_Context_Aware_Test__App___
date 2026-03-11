@@ -30,12 +30,6 @@ export const PipelineState = Annotation.Root({
   // ─── Planner agent ───
   actionPlan: Annotation({ reducer: (_, v) => v, default: () => null }),
 
-  // ─── Critic agent ───
-  criticResult: Annotation({ reducer: (_, v) => v, default: () => null }),
-
-  // ─── Evaluator agent ───
-  scores: Annotation({ reducer: (_, v) => v, default: () => null }),
-
   // ─── Pipeline log (append-only) ───
   stageLog: Annotation({
     reducer: (prev, v) => [...(prev || []), ...(Array.isArray(v) ? v : [v])],

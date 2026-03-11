@@ -70,7 +70,6 @@ export default function ResultPanel({ record, result }) {
               timingDecision: result.timingDecision,
               messageOutput: result.messageOutput,
               actionPlan: result.actionPlan,
-              scores: result.scores,
             },
             null,
             2,
@@ -161,58 +160,4 @@ function ComplianceView({ result }) {
   );
 }
 
-function CriticView({ result }) {
-  if (!result) return <div className="text-muted">No critic data</div>;
 
-  return (
-    <div>
-      <div style={{ marginBottom: 12 }}>
-        Status:{" "}
-        {result.approved ? (
-          <span className="text-success">✓ Approved</span>
-        ) : (
-          <span className="text-warning">
-            ⚠ Issues Found ({result.issues.length})
-          </span>
-        )}
-      </div>
-      {result.issues?.length > 0 && (
-        <div>
-          {result.issues.map((issue, i) => (
-            <div
-              key={i}
-              style={{
-                padding: 8,
-                background: "var(--bg-primary)",
-                borderRadius: 6,
-                marginBottom: 6,
-              }}
-            >
-              <div
-                style={{ fontSize: 12, fontWeight: 600 }}
-                className="text-warning"
-              >
-                {issue.category}
-              </div>
-              <div style={{ fontSize: 12, marginTop: 2 }}>
-                {issue.description}
-              </div>
-              <div
-                style={{
-                  fontSize: 11,
-                  color: "var(--text-secondary)",
-                  marginTop: 2,
-                }}
-              >
-                Suggested fix: {issue.suggestedFix}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      {result.overallAssessment && (
-        <div className="reasoning-box">{result.overallAssessment}</div>
-      )}
-    </div>
-  );
-}

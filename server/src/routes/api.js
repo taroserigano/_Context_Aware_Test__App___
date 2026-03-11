@@ -166,13 +166,11 @@ router.post("/process-all", async (req, res) => {
 
       results.push({
         taskId: record.task_id,
-        scores: finalState.scores,
         channelDecision: finalState.channelDecision,
         timingDecision: finalState.timingDecision,
         messageOutput: finalState.messageOutput,
         actionPlan: finalState.actionPlan,
         complianceResult: finalState.complianceResult,
-        criticResult: finalState.criticResult,
         stageLog: finalState.stageLog,
       });
 
@@ -194,21 +192,11 @@ router.post("/process-all", async (req, res) => {
     }
   }
 
-  // Summary
-  const composites = results
-    .filter((r) => r.scores?.composite)
-    .map((r) => r.scores.composite);
-  const avgComposite =
-    composites.length > 0
-      ? composites.reduce((a, b) => a + b, 0) / composites.length
-      : 0;
-
   res.write(
     `data: ${JSON.stringify({
       type: "summary",
       totalRecords: cachedRecords.length,
       processedRecords: results.length,
-      averageComposite: Math.round(avgComposite * 1000) / 1000,
       results,
     })}\n\n`,
   );

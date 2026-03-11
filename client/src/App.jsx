@@ -1,9 +1,9 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 import RecordSelector from "./components/RecordSelector.jsx";
 import PipelineView from "./components/PipelineView.jsx";
 import ResultPanel from "./components/ResultPanel.jsx";
-import ScoreCard from "./components/ScoreCard.jsx";
+
 
 const STAGES = [
   { id: "enricher", name: "Enricher", desc: "Pre-compute context (no LLM)" },
@@ -20,8 +20,7 @@ const STAGES = [
   },
   { id: "compliance", name: "Compliance", desc: "Check & repair violations" },
   { id: "planner", name: "Planner", desc: "Decide next CRM action" },
-  { id: "critic", name: "Critic", desc: "Cross-component review" },
-  { id: "evaluator", name: "Evaluator", desc: "Score vs expected" },
+
 ];
 
 export default function App() {
@@ -43,6 +42,16 @@ export default function App() {
     setStageData({});
     setAllResults([]);
   }, []);
+
+  // Auto-load records on mount
+  useEffect(() => {
+    fetch("/api/records")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.records?.length) handleRecordsLoaded(data.records);
+      })
+      .catch(() => {});
+  }, [handleRecordsLoaded]);
 
   const handleLearn = useCallback(async () => {
     try {
@@ -229,7 +238,6 @@ export default function App() {
           {result && selectedRecord && (
             <>
               <ResultPanel record={selectedRecord} result={result} />
-              <ScoreCard scores={result.scores} />
             </>
           )}
 
@@ -253,39 +261,12 @@ export default function App() {
                 >
                   <div className="task-id">{r.taskId}</div>
                   <div className="meta">
-                    Score:{" "}
-                    <strong
-                      className={
-                        r.scores?.composite >= 0.8
-                          ? "text-success"
-                          : r.scores?.composite >= 0.6
-                            ? "text-warning"
-                            : "text-error"
-                      }
-                    >
-                      {((r.scores?.composite || 0) * 100).toFixed(1)}%
-                    </strong>{" "}
-                    &bull; Channel: {r.channelDecision?.channel} &bull; Action:{" "}
+                    Channel: {r.channelDecision?.channel} &bull; Action:{" "}
                     {r.actionPlan?.type}
                   </div>
                 </div>
               ))}
-              {allResults.length > 0 && (
-                <div style={{ marginTop: 12, textAlign: "center" }}>
-                  <span className="composite-score" style={{ fontSize: 32 }}>
-                    Avg:{" "}
-                    {(
-                      (allResults.reduce(
-                        (a, r) => a + (r.scores?.composite || 0),
-                        0,
-                      ) /
-                        allResults.length) *
-                      100
-                    ).toFixed(1)}
-                    %
-                  </span>
-                </div>
-              )}
+
             </div>
           )}
 
